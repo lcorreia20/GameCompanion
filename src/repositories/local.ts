@@ -10,6 +10,7 @@ export const PROGRESS_V2_KEY = 'gamecompanion:progress:v2'
 export const LEGACY_SNAPSHOT_KEY = 'gamecompanion:progress:v1:before-migration'
 export const INVALID_V2_SNAPSHOT_KEY = 'gamecompanion:progress:v2:before-recovery'
 export const SETTINGS_KEY = 'gamecompanion:spoiler:v1'
+export const THEME_KEY = 'gamecompanion:theme:v1'
 const allKnownGames = [pbz, demo] // demo ocultada da UI, mas mantida para preservar backups antigos.
 
 export interface PersistedProgressV2 {
@@ -107,4 +108,9 @@ export const localSettingsRepository: SettingsRepository = {
     } catch { return 0 }
   },
   setSpoilerLevel(level) { localStorage.setItem(SETTINGS_KEY, String(level)) },
+  getTheme() {
+    try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark' }
+    catch { return 'dark' }
+  },
+  setTheme(theme) { localStorage.setItem(THEME_KEY, theme) },
 }

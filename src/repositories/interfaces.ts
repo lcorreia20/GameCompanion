@@ -18,4 +18,6 @@ export interface ProgressRepository {
 export interface SettingsRepository {
   getSpoilerLevel(): SpoilerLevel
   setSpoilerLevel(level: SpoilerLevel): void
+  getTheme(): 'dark' | 'light'
+  setTheme(theme: 'dark' | 'light'): void
 }

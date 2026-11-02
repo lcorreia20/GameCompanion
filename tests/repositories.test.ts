@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { demo } from '../src/data/demo'
 import { pbz } from '../src/data/pbz'
 import { makeBackup, STORAGE_KEY } from '../src/storage'
-import { INVALID_V2_SNAPSHOT_KEY, LEGACY_SNAPSHOT_KEY, localGameRepository, localProgressRepository, localSettingsRepository, PROGRESS_V2_KEY } from '../src/repositories/local'
+import { INVALID_V2_SNAPSHOT_KEY, LEGACY_SNAPSHOT_KEY, localGameRepository, localProgressRepository, localSettingsRepository, PROGRESS_V2_KEY, THEME_KEY } from '../src/repositories/local'
 
 beforeEach(() => localStorage.clear())
 
@@ -58,5 +58,9 @@ describe('migração sem perda de dados', () => {
     expect(localSettingsRepository.getSpoilerLevel()).toBe(2)
     localSettingsRepository.setSpoilerLevel(1)
     expect(localSettingsRepository.getSpoilerLevel()).toBe(1)
+    expect(localSettingsRepository.getTheme()).toBe('dark')
+    localSettingsRepository.setTheme('light')
+    expect(localStorage.getItem(THEME_KEY)).toBe('light')
+    expect(localSettingsRepository.getTheme()).toBe('light')
   })
 })

@@ -4,22 +4,42 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import App from '../src/App'
 import { pbzContent } from '../src/data/games/phantom-blade-zero'
 import { makeBackup, STORAGE_KEY } from '../src/storage'
-import { INVALID_V2_SNAPSHOT_KEY, PROGRESS_V2_KEY, SETTINGS_KEY } from '../src/repositories/local'
+import { INVALID_V2_SNAPSHOT_KEY, PROGRESS_V2_KEY, SETTINGS_KEY, THEME_KEY } from '../src/repositories/local'
 
-beforeEach(() => localStorage.clear())
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
+beforeEach(() => { localStorage.clear(); delete document.documentElement.dataset.theme })
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.restoreAllMocks() })
 function openGame() { fireEvent.click(screen.getByRole('heading', { name: 'Phantom Blade Zero' }).closest('button')!) }
-function selectSpoilers(value: string) { fireEvent.change(screen.getByRole('combobox', { name: 'Nível de dicas' }), { target: { value } }) }
 
 describe('guia real no navegador', () => {
   it('apresenta nove etapas, troféus e informação do cabeçalho sem checklist demonstrativo', () => {
     render(<App />); openGame()
     expect(screen.getByRole('heading', { name: /Checklist por região/ })).toBeDefined()
-    expect(screen.getByText(/36 · 1 platina/)).toBeDefined()
+    const metrics = screen.getByRole('region', { name: 'Informações da platina' })
+    expect(within(metrics).getByText('36')).toBeDefined()
+    expect(metrics.querySelectorAll('svg')).toHaveLength(7)
+    expect(metrics.textContent).not.toContain('PowerPyx')
+    expect(screen.getByRole('img', { name: /Arte oficial de Phantom Blade Zero/ }).getAttribute('src')).toContain('phantom-blade-zero-official.jpg')
     expect(screen.getByRole('progressbar').getAttribute('aria-valuemax')).toBe('35')
-    expect(screen.getAllByRole('button', { name: /Etapa \d/ })).toHaveLength(9)
+    expect(within(screen.getByRole('group', { name: 'Selecionar região' })).getAllByRole('button')).toHaveLength(10)
+    expect(screen.getByRole('button', { name: /Crimson Forest/ })).toBeDefined()
+    expect(screen.queryByRole('combobox', { name: 'Nível de dicas' })).toBeNull()
     expect(screen.queryByText('Definir um objetivo pessoal')).toBeNull()
     expect(screen.getByRole('heading', { name: 'Antes de sair desta região' })).toBeDefined()
+  })
+
+  it('inicia escuro em azul, alterna para claro e persiste tema sem alterar o progresso', () => {
+    const { unmount } = render(<App />)
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(screen.getByRole('button', { name: 'Ativar tema claro' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Ativar tema claro' }))
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(localStorage.getItem(THEME_KEY)).toBe('light')
+    expect(localStorage.getItem(PROGRESS_V2_KEY)).toBeNull()
+    unmount(); render(<App />)
+    expect(document.documentElement.dataset.theme).toBe('light')
+    fireEvent.click(screen.getByRole('button', { name: 'Ativar tema escuro' }))
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(localStorage.getItem(THEME_KEY)).toBe('dark')
   })
 
   it('marca objetivo real por ID em v2, alterna região e persiste na remontagem', () => {
@@ -39,26 +59,34 @@ describe('guia real no navegador', () => {
     expect((within(restoredGroup).getAllByRole('checkbox')[0] as HTMLInputElement).checked).toBe(true)
   })
 
-  it('protege título, descrição e pesquisa no nível zero e persiste preferência', () => {
-    const objective = pbzContent.objectives.find(item => item.spoiler === 2 && item.regionIds.includes('weeping'))!
+  it('mostra nomes sem combo e só revela detalhes após clicar no olho da linha, sem alterar a marcação', () => {
+    const objective = pbzContent.objectives.find(item => item.category === 'trophy' && item.regionIds.includes('weeping'))!
+    localStorage.setItem(SETTINGS_KEY, '2') // preferência antiga permanece intacta, mas não libera descrições.
     const { unmount } = render(<App />); openGame()
-    expect(document.body.textContent).not.toContain(objective.title)
-    expect(document.body.innerHTML).not.toContain(objective.title)
+    const trophyGroup = screen.getByText('Troféus', { selector: 'summary' }).closest('details')!
+    fireEvent.click(within(trophyGroup).getByText('Troféus', { selector: 'summary' }))
+    expect(within(trophyGroup).getByText(objective.title)).toBeDefined()
     expect(document.body.innerHTML).not.toContain(objective.description)
-    expect(document.body.innerHTML).not.toContain('phantom-blade-zero-true-ending-guide')
-    const search = screen.getByPlaceholderText('Buscar objetivo visível...')
+    const eye = within(trophyGroup).getByRole('button', { name: `Ver descrição de ${objective.title}` })
+    const checkbox = within(trophyGroup).getByRole('checkbox', { name: `Concluir: ${objective.title}` }) as HTMLInputElement
+    fireEvent.click(eye)
+    expect(screen.getByText(objective.description)).toBeDefined()
+    expect(within(trophyGroup).getByRole('button', { name: `Ocultar descrição de ${objective.title}` }).getAttribute('aria-expanded')).toBe('true')
+    expect(checkbox.checked).toBe(false)
+    fireEvent.click(within(trophyGroup).getByRole('button', { name: `Ocultar descrição de ${objective.title}` }))
+    expect(document.body.innerHTML).not.toContain(objective.description)
+    const search = screen.getByPlaceholderText('Buscar pelo nome...')
     fireEvent.change(search, { target: { value: objective.title } })
-    expect(screen.getByText(/Nenhum objetivo visível/)).toBeDefined()
-    fireEvent.change(search, { target: { value: '' } })
-    selectSpoilers('2')
-    expect(document.body.textContent).toContain(objective.title)
+    expect(within(trophyGroup).getByText(objective.title)).toBeDefined()
+    fireEvent.change(search, { target: { value: objective.description } })
+    expect(screen.getByText(/Nenhum objetivo para esta seleção/)).toBeDefined()
     expect(localStorage.getItem(SETTINGS_KEY)).toBe('2')
     unmount(); render(<App />); openGame()
-    expect((screen.getByRole('combobox', { name: 'Nível de dicas' }) as HTMLSelectElement).value).toBe('2')
+    expect(document.body.innerHTML).not.toContain(objective.description)
   })
 
   it('filtra região e perdíveis pendentes sem perder marcações compartilhadas', () => {
-    render(<App />); openGame(); selectSpoilers('2')
+    render(<App />); openGame()
     fireEvent.click(screen.getByRole('button', { name: 'Perdíveis', exact: true }))
     expect(screen.getAllByText(/perdíveis e .* pré-requisitos/).length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: 'Pendentes', exact: true }))
@@ -68,10 +96,23 @@ describe('guia real no navegador', () => {
   })
 
   it('avisa em Crimson sobre Apprentice Healer pendente da etapa anterior', () => {
-    render(<App />); openGame(); selectSpoilers('2')
-    fireEvent.click(screen.getByRole('button', { name: /02 · 0%Crimson Forest/ }))
+    render(<App />); openGame()
+    fireEvent.click(screen.getByRole('button', { name: /Crimson Forest/ }))
     const warning = screen.getByRole('region', { name: 'Antes de sair desta região' })
     expect(within(warning).getAllByText(/Pré-requisito anterior:/).some(item => item.textContent?.includes('Apprentice Healer'))).toBe(true)
+  })
+
+  it('reserva condições de bloqueio do final para o olho, mantendo o nome visível', () => {
+    const gate = pbzContent.objectives.find(item => item.id === 'ending-mirage-gate')!
+    render(<App />); openGame()
+    fireEvent.click(screen.getByRole('button', { name: /Mirage Estate/ }))
+    const group = screen.getByText('Perdíveis', { selector: 'summary' }).closest('details')!
+    fireEvent.click(within(group).getByText('Perdíveis', { selector: 'summary' }))
+    expect(within(group).getByText(gate.title)).toBeDefined()
+    expect(document.body.textContent).not.toContain(gate.description)
+    fireEvent.click(within(group).getByRole('button', { name: `Ver descrição de ${gate.title}` }))
+    expect(document.body.textContent).toContain(gate.description)
+    expect(document.body.textContent).toContain(gate.missableBefore!)
   })
 
   it('mantém links gerais acessíveis sem spoilers', () => {
