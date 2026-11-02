@@ -1,0 +1,33 @@
+name: gamecompanion
+
+services:
+  web:
+    build:
+      context: .github/docker
+      dockerfile: ../../Dockerfile
+    init: true
+    ports:
+      - "192.168.1.112:5181:5173/tcp"
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+        read_only: true
+      - type: volume
+        source: node_modules
+        target: /app/node_modules
+    environment:
+      NPM_CONFIG_CACHE: /tmp/npm-cache
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1.0
+    restart: unless-stopped
+
+volumes:
+  node_modules:

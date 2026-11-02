@@ -1,0 +1,41 @@
+.guide-filters input:focus-visible,
+.guide-filters select:focus-visible {
+  outline: 2px solid #c4fa64;
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline-color: #c4fa64;
+}
+
+.guide-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.guide-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  cursor: pointer;
+}
+
+.guide-entry small,
+.guide-entry span span {
+  display: block;
+  margin-top: 0.35rem;
+  color: #a8b8b5;
+}
+
+.catalog-footer small {
+  display: block;
+  margin-top: 0.35rem;
+  color: #c4fa64;
+  font-weight: 700;
+}
