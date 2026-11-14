@@ -11,6 +11,8 @@ export const LEGACY_SNAPSHOT_KEY = 'gamecompanion:progress:v1:before-migration'
 export const INVALID_V2_SNAPSHOT_KEY = 'gamecompanion:progress:v2:before-recovery'
 export const SETTINGS_KEY = 'gamecompanion:spoiler:v1'
 export const THEME_KEY = 'gamecompanion:theme:v1'
+export const INTERFACE_LANGUAGE_KEY = 'gamecompanion:interface-language:v1'
+export const GAME_LANGUAGE_KEY = 'gamecompanion:game-language:v1'
 const allKnownGames = [pbz, demo] // demo ocultada da UI, mas mantida para preservar backups antigos.
 
 export interface PersistedProgressV2 {
@@ -113,4 +115,14 @@ export const localSettingsRepository: SettingsRepository = {
     catch { return 'dark' }
   },
   setTheme(theme) { localStorage.setItem(THEME_KEY, theme) },
+  getInterfaceLanguage() {
+    try { return localStorage.getItem(INTERFACE_LANGUAGE_KEY) === 'en' ? 'en' : 'pt-BR' }
+    catch { return 'pt-BR' }
+  },
+  setInterfaceLanguage(language) { localStorage.setItem(INTERFACE_LANGUAGE_KEY, language) },
+  getGameLanguage() {
+    try { return localStorage.getItem(GAME_LANGUAGE_KEY) === 'pt-BR' ? 'pt-BR' : 'en' }
+    catch { return 'en' }
+  },
+  setGameLanguage(language) { localStorage.setItem(GAME_LANGUAGE_KEY, language) },
 }

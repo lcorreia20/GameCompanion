@@ -4,13 +4,54 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import App from '../src/App'
 import { pbzContent } from '../src/data/games/phantom-blade-zero'
 import { makeBackup, STORAGE_KEY } from '../src/storage'
-import { INVALID_V2_SNAPSHOT_KEY, PROGRESS_V2_KEY, SETTINGS_KEY, THEME_KEY } from '../src/repositories/local'
+import { GAME_LANGUAGE_KEY, INTERFACE_LANGUAGE_KEY, INVALID_V2_SNAPSHOT_KEY, PROGRESS_V2_KEY, SETTINGS_KEY, THEME_KEY } from '../src/repositories/local'
 
 beforeEach(() => { localStorage.clear(); delete document.documentElement.dataset.theme })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.restoreAllMocks() })
 function openGame() { fireEvent.click(screen.getByRole('heading', { name: 'Phantom Blade Zero' }).closest('button')!) }
 
 describe('guia real no navegador', () => {
+  it('alterna idiomas independentes com nomes PSN PT-BR sem mudar IDs nem progresso', () => {
+    const { unmount } = render(<App />)
+    const interfaceSelect = screen.getByRole('combobox', { name: 'Idioma da interface' })
+    expect(interfaceSelect.closest('.site-header')).not.toBeNull()
+    expect(interfaceSelect.closest('.topbar')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'Idioma dos itens' })).toBeNull()
+    openGame()
+    const gameSelect = screen.getByRole('combobox', { name: 'Idioma dos itens' })
+    expect(gameSelect.closest('.checklist-heading')).not.toBeNull()
+    expect(gameSelect.closest('.topbar')).toBeNull()
+    expect(interfaceSelect.parentElement?.textContent).toContain('🇧🇷')
+    expect(gameSelect.parentElement?.textContent).toContain('🇺🇸')
+    fireEvent.click(screen.getByRole('button', { name: 'Visão global' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Troféus' }))
+    expect(screen.getByText('With Heart and Blood')).toBeDefined()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma dos itens' }), { target: { value: 'pt-BR' } })
+    expect(screen.getByRole('button', { name: /Vale do Córrego dos Prantos/ })).toBeDefined()
+    expect(gameSelect.parentElement?.textContent).toContain('🇧🇷')
+    expect(screen.getByText('Sangue e Coração')).toBeDefined()
+    expect(screen.queryByText('With Heart and Blood')).toBeNull()
+    const checkbox = screen.getByRole('checkbox', { name: 'Concluir: Sangue e Coração' }) as HTMLInputElement
+    fireEvent.click(checkbox)
+    expect(checkbox.checked).toBe(true)
+    const snapshot = localStorage.getItem(PROGRESS_V2_KEY)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma da interface' }), { target: { value: 'en' } })
+    expect(interfaceSelect.parentElement?.textContent).toContain('🇺🇸')
+    expect(screen.getByRole('heading', { name: /Checklist by region/ })).toBeDefined()
+    expect(screen.getByText('Sangue e Coração')).toBeDefined()
+    expect(document.documentElement.lang).toBe('en')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Game item language' }), { target: { value: 'en' } })
+    expect(screen.getByRole('button', { name: /Weeping Valley Creek/ })).toBeDefined()
+    expect(screen.getByText('With Heart and Blood')).toBeDefined()
+    expect(localStorage.getItem(PROGRESS_V2_KEY)).toBe(snapshot)
+    expect(localStorage.getItem(INTERFACE_LANGUAGE_KEY)).toBe('en')
+    expect(localStorage.getItem(GAME_LANGUAGE_KEY)).toBe('en')
+    unmount(); render(<App />); openGame()
+    expect(screen.getByRole('heading', { name: /Checklist by region/ })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'All regions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Trophies' }))
+    expect((screen.getByRole('checkbox', { name: 'Complete: With Heart and Blood' }) as HTMLInputElement).checked).toBe(true)
+  })
   it('apresenta nove etapas, troféus e informação do cabeçalho sem checklist demonstrativo', () => {
     render(<App />); openGame()
     expect(screen.getByRole('heading', { name: /Checklist por região/ })).toBeDefined()

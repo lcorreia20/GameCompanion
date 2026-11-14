@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import type { GuideMetadata } from '../domain/models/guide'
+import type { Language } from '../data/games/phantom-blade-zero/localization'
+import { translate as tr } from '../i18n'
 
 type IconName = 'difficulty' | 'time' | 'trophy' | 'alert' | 'offline' | 'shield' | 'journey'
 
@@ -18,7 +20,8 @@ function MetricIcon({ name }: { name: IconName }) {
 
 const compact = (value: string) => value.replace(/\s*\([^)]*\)/g, '').replace(' horas', 'h').trim()
 
-export function PlatinumMetrics({ metadata }: { metadata: GuideMetadata }) {
+export function PlatinumMetrics({ metadata, language }: { metadata: GuideMetadata; language?: Language }) {
+  const lang = language ?? 'pt-BR'
   const metrics: { label: string; value: string; icon: IconName }[] = [
     { label: 'Dificuldade', value: `${compact(metadata.estimates.difficultyEasy)} fácil · ${compact(metadata.estimates.difficultyNormal)} normal`, icon: 'difficulty' },
     { label: 'Tempo', value: compact(metadata.estimates.platinumHours), icon: 'time' },
@@ -28,5 +31,5 @@ export function PlatinumMetrics({ metadata }: { metadata: GuideMetadata }) {
     { label: 'Dificuldade obrigatória', value: metadata.difficultyTrophies ? 'Sim' : 'Não', icon: 'shield' },
     { label: 'Jogadas mínimas', value: compact(metadata.estimates.minimumPlaythroughs), icon: 'journey' },
   ]
-  return <section className="guide-metrics" aria-label="Informações da platina">{metrics.map(metric => <div className="guide-metric" key={metric.label}><span className="metric-icon"><MetricIcon name={metric.icon}/></span><span className="metric-copy"><small>{metric.label}</small><strong>{metric.value}</strong></span></div>)}</section>
+  return <section className="guide-metrics" aria-label={tr('Informações da platina', lang)}>{metrics.map(metric => <div className="guide-metric" key={metric.label}><span className="metric-icon"><MetricIcon name={metric.icon}/></span><span className="metric-copy"><small>{tr(metric.label, lang)}</small><strong>{lang === 'en' ? metric.value.replace(' fácil', ' easy').replace('Sim', 'Yes').replace('Não', 'No') : metric.value}</strong></span></div>)}</section>
 }

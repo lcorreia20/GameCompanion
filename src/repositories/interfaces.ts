@@ -1,5 +1,6 @@
 import type { Game, SpoilerLevel } from '../types'
 import type { Progress } from '../storage'
+import type { Language } from '../data/games/phantom-blade-zero/localization'
 
 export interface GameRepository {
   list(): Game[]
@@ -20,4 +21,8 @@ export interface SettingsRepository {
   setSpoilerLevel(level: SpoilerLevel): void
   getTheme(): 'dark' | 'light'
   setTheme(theme: 'dark' | 'light'): void
+  getInterfaceLanguage(): Language
+  setInterfaceLanguage(language: Language): void
+  getGameLanguage(): Language
+  setGameLanguage(language: Language): void
 }

@@ -12,6 +12,8 @@ Aplicação web estática em React, TypeScript e Vite para consultar o guia regi
 
 **Aparência:** o tema escuro cinza e azul é o padrão; o botão no cabeçalho alterna para o tema claro. A preferência de tema fica neste navegador, independente do progresso e dos backups JSON.
 
+**Idiomas (versão local):** o seletor compacto da interface e o botão do tema ficam ao lado do logo, acima da navegação (PT-BR padrão ou inglês); o seletor junto ao título do checklist controla os nomes de itens (inglês padrão ou PT-BR). Ambos guardam a preferência separadamente, sem tocar nos IDs de objetivos, no progresso ou nos backups. Os 36 títulos de troféus e 11 nomes de missões em PT-BR foram conferidos na [lista de troféus PSN PT-BR do Exophase](https://www.exophase.com/game/phantom-blade-zero-psn/trophies/pt-BR/). As nove áreas do roteiro usam os nomes PT-BR da [lista de regiões do MetaBot](https://metabot.gg/pt_BR/phantom-blade-zero/regions), que declara extração dos dados do jogo; um [detonado em português](https://kungfupunk.com/pt-br/walkthrough) usa as mesmas grafias. Não temos capturas do console para confirmar visualmente esses textos. Outros nomes do jogo continuam na grafia inglesa do catálogo até confirmação; rótulos autorais do checklist não são apresentados como nomes oficiais. Na interface inglesa, os textos editoriais extensos do guia e suas fontes continuam em português (indicado na página), enquanto navegação, filtros e indicadores são traduzidos.
+
 Projeto Vite executado com Node.js 22 em Docker rootless. As dependências npm são instaladas **no contêiner**, sem Node/npm no host. O projeto precisa conter `package.json`, `package-lock.json` e os scripts `dev` e `build`.
 
 ## Desenvolvimento local na LAN
