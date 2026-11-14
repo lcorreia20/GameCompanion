@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from '../src/App'
 import { pbzContent } from '../src/data/games/phantom-blade-zero'
+import { regionMapUrl } from '../src/data/games/phantom-blade-zero/mapLinks'
 import { makeBackup, STORAGE_KEY } from '../src/storage'
 import { GAME_LANGUAGE_KEY, INTERFACE_LANGUAGE_KEY, INVALID_V2_SNAPSHOT_KEY, PROGRESS_V2_KEY, SETTINGS_KEY, THEME_KEY } from '../src/repositories/local'
 
@@ -11,6 +12,52 @@ afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.r
 function openGame() { fireEvent.click(screen.getByRole('heading', { name: 'Phantom Blade Zero' }).closest('button')!) }
 
 describe('guia real no navegador', () => {
+  it('abre o mapa da região selecionada em outra aba e desabilita na visão global', () => {
+    render(<App />); openGame()
+    const map = screen.getByRole('link', { name: 'Abrir mapa da região ↗' })
+    expect(map.getAttribute('href')).toBe('https://metabot.gg/pt_BR/phantom-blade-zero/map?region=weeping-creek-valley')
+    expect(map.getAttribute('target')).toBe('_blank')
+    expect(map.getAttribute('rel')).toBe('noopener noreferrer')
+    fireEvent.click(screen.getByRole('button', { name: /Mirage Estate/ }))
+    expect(screen.getByRole('link', { name: 'Abrir mapa da região ↗' }).getAttribute('href')).toContain('region=mirage-estate')
+    fireEvent.click(screen.getByRole('button', { name: 'Visão global' }))
+    expect(screen.queryByRole('link', { name: 'Abrir mapa da região ↗' })).toBeNull()
+    const disabled = screen.getByRole('button', { name: 'Abrir mapa da região ↗' }) as HTMLButtonElement
+    expect(disabled.disabled).toBe(true)
+    expect(disabled.parentElement?.getAttribute('title')).toBe('Selecione uma região para abrir o mapa.')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Idioma da interface' }), { target: { value: 'en' } })
+    expect(screen.getByRole('button', { name: 'Open region map ↗' }).parentElement?.getAttribute('title')).toBe('Select a region to open its map.')
+    fireEvent.click(within(screen.getByRole('group', { name: 'Select region' })).getByRole('button', { name: /Crimson Forest/ }))
+    expect(screen.getByRole('link', { name: 'Open region map ↗' }).getAttribute('href')).toBe('https://metabot.gg/en/phantom-blade-zero/map?region=crimson-forest')
+    expect(localStorage.getItem(PROGRESS_V2_KEY)).toBeNull()
+  })
+
+  it('cobre todas as regiões com links individuais, sem link para visão global', () => {
+    for (const region of pbzContent.regions) {
+      const url = regionMapUrl(region.id, 'pt-BR')
+      expect(url).toMatch(/^https:\/\/metabot\.gg\/pt_BR\/phantom-blade-zero\/map\?region=[a-z-]+$/)
+      expect(regionMapUrl(region.id, 'en')).toContain('/en/phantom-blade-zero/map?region=')
+    }
+    expect(regionMapUrl('Todas', 'pt-BR')).toBeNull()
+  })
+  it('sincroniza chefe e troféu na interface sem apagar a etapa ao desmarcar o troféu', () => {
+    render(<App />); openGame()
+    fireEvent.click(screen.getByText('Chefes', { selector: 'summary' }))
+    fireEvent.click(screen.getByText('Troféus', { selector: 'summary' }))
+    const boss = screen.getByRole('checkbox', { name: 'Concluir: Derrotar Axemaster Peng Meng' }) as HTMLInputElement
+    const trophy = screen.getByRole('checkbox', { name: 'Concluir: The Axe’s Grudge' }) as HTMLInputElement
+    fireEvent.click(boss)
+    expect(trophy.checked).toBe(true)
+    expect(JSON.parse(localStorage.getItem(PROGRESS_V2_KEY)!).completed.pbz).toEqual(expect.arrayContaining(['boss-peng-meng', 'trophy-axes-grudge']))
+    fireEvent.click(trophy)
+    expect(trophy.checked).toBe(false)
+    expect(boss.checked).toBe(true)
+    fireEvent.click(trophy)
+    expect(trophy.checked).toBe(true)
+    fireEvent.click(boss)
+    expect(trophy.checked).toBe(false)
+    expect(boss.checked).toBe(false)
+  })
   it('alterna idiomas independentes com nomes PSN PT-BR sem mudar IDs nem progresso', () => {
     const { unmount } = render(<App />)
     const interfaceSelect = screen.getByRole('combobox', { name: 'Idioma da interface' })

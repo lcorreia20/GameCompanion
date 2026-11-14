@@ -5,11 +5,13 @@ import { GameCard } from './components/GameCard'
 import { PlatinumMetrics } from './components/PlatinumMetrics'
 import { ProgressIndicator } from './components/ProgressIndicator'
 import { pbzContent } from './data/games/phantom-blade-zero'
+import { regionMapUrl } from './data/games/phantom-blade-zero/mapLinks'
 import { gameName } from './data/games/phantom-blade-zero/localization'
 import type { Language } from './data/games/phantom-blade-zero/localization'
 import { translate } from './i18n'
 import type { Objective } from './domain/models/guide'
 import { optionalExplorationProgress, platinumProgress, regionProgress, requiredObjectivesProgress } from './domain/services/progress'
+import { toggleLinkedObjective, trophyRequirements } from './domain/services/trophyLinks'
 import { localGameRepository, localProgressRepository, localSettingsRepository } from './repositories/local'
 import type { Progress } from './storage'
 import { MAX_IMPORT_BYTES } from './storage'
@@ -17,6 +19,7 @@ import './components/GuideLayout.css'
 
 const game = localGameRepository.get('pbz')!
 const guide = pbzContent
+const linkedTrophies = trophyRequirements(guide)
 type Filter = 'Todos' | 'Pendentes' | 'Perdíveis' | 'Troféus' | 'Missões' | 'Coletáveis' | 'Chefes'
 const filters: Filter[] = ['Todos', 'Pendentes', 'Perdíveis', 'Troféus', 'Missões', 'Coletáveis', 'Chefes']
 type Group = 'Perdíveis' | 'Missões' | 'Coletáveis' | 'Troféus' | 'Chefes' | 'História e finais'
@@ -68,6 +71,7 @@ function GuideApp() {
   const required = requiredObjectivesProgress(guide, completed)
   const optional = optionalExplorationProgress(guide, completed)
   const regionData = guide.regions.find(item => item.id === region)
+  const mapUrl = regionData ? regionMapUrl(regionData.id, interfaceLanguage) : null
   const regional = regionData ? regionProgress(guide, region, completed) : null
   const regionalItems = guide.objectives.filter(item => region === 'Todas' || item.regionIds.includes(region))
   const pendingMissables = regionalItems.filter(item => item.missable && item.requiredForPlatinum && !completed.has(item.id))
@@ -101,7 +105,7 @@ function GuideApp() {
     } catch { setNotice('Não foi possível salvar o progresso. Nenhuma marcação foi alterada.'); return false }
   }
   function toggle(id: string) {
-    persist({ ...progress, [game.id]: completed.has(id) ? [...completed].filter(item => item !== id) : [...completed, id] })
+    persist({ ...progress, [game.id]: [...toggleLinkedObjective(guide, completed, id)] })
   }
   function exportBackup() {
     try {
@@ -151,13 +155,14 @@ function GuideApp() {
   function renderObjective(item: Objective) {
     const revealed = revealedIds.has(item.id)
     const title = objectiveName(item)
+    const requirements = linkedTrophies.get(item.id)
     const trophy = item.category === 'trophy' ? guide.trophies.find(t => t.id === item.relatedTrophyIds[0]) : undefined
     const quest = item.questId ? guide.quests.find(q => q.id === item.questId) : undefined
     const step = quest?.steps.find(s => item.relatedStepIds?.includes(s.id))
     return <article className={`guide-objective ${completed.has(item.id) ? 'is-done' : ''}`} key={item.id}>
       <div className="guide-objective-row"><label className="guide-objective-head">
         <input type="checkbox" disabled={blocked} checked={completed.has(item.id)} onChange={() => toggle(item.id)} aria-label={`${ui("Concluir:")} ${title}`}/>
-        <span><strong>{title}</strong><small>{item.missable ? `⚠ ${ui('Perdível')} · ` : ''}{ui(item.requiredForPlatinum ? 'Necessário para platina' : 'Exploração opcional')} · {ui(item.verification === 'verified' ? 'Documentado' : 'Verificação parcial')}</small></span>
+        <span><strong>{title}</strong><small>{item.missable ? `⚠ ${ui('Perdível')} · ` : ''}{ui(item.requiredForPlatinum ? 'Necessário para platina' : 'Exploração opcional')} · {ui(item.verification === 'verified' ? 'Documentado' : 'Verificação parcial')}{requirements && ` · ${interfaceLanguage === 'en' ? 'Linked' : 'Vinculados'}: ${requirements.filter(id => completed.has(id)).length}/${requirements.length}`}</small></span>
       </label><button type="button" className="guide-reveal" aria-expanded={revealed} aria-label={`${ui(revealed ? 'Ocultar' : 'Ver')} ${ui('descrição de')} ${title}`} title={ui(revealed ? 'Ocultar' : 'Ver')} onClick={() => toggleDetails(item.id)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/>{revealed && <path d="M3 21 21 3"/>}</svg></button></div>
       {revealed && <div className="guide-objective-details">
         <p>{item.description}</p>
@@ -192,7 +197,8 @@ function GuideApp() {
         <ProgressIndicator done={platinum.done} total={blocked ? 0 : platinum.total} label={ui("Progresso da Platina")} language={interfaceLanguage}/>
         <section className="guide-section guide-main" aria-labelledby="guide-title"><div className="checklist-heading"><div><div className="section-overline">{ui('ROTEIRO DOCUMENTADO · NOVE ETAPAS')}</div><h2 id="guide-title">{ui('Checklist por região')}<span className="heading-dot">.</span></h2></div><label className="language-switch game-language"><span>{ui('Idioma dos itens')}</span><span className="language-choice"><span className="language-flag" aria-hidden="true">{gameLanguage === 'pt-BR' ? '🇧🇷' : '🇺🇸'}</span><select aria-label={ui('Idioma dos itens')} value={gameLanguage} onChange={event => changeLanguage('game', event.target.value as Language)}><option value="en">EN</option><option value="pt-BR">PT-BR</option></select></span></label></div>
           <div className="region-navigation" role="group" aria-label={ui("Selecionar região")}><button aria-pressed={region === 'Todas'} className={region === 'Todas' ? 'active' : ''} onClick={() => setRegion('Todas')}>{ui('Visão global')}</button>{guide.regions.map(r => { const score = regionProgress(guide, r.id, completed); const hasMissable = guide.objectives.some(o => o.regionIds.includes(r.id) && o.missable && o.requiredForPlatinum && !completed.has(o.id)); return <button key={r.id} aria-pressed={region === r.id} className={region === r.id ? 'active' : ''} onClick={() => setRegion(r.id)}><small>{String(r.order).padStart(2, '0')} · {blocked ? '—' : `${score.percent}%`}</small>{regionName(r.id, r.name)}{hasMissable && <span aria-label={interfaceLanguage === "en" ? "Pending missable" : "Perdível pendente"}>⚠ {ui("Pendência crítica")}</span>}</button> })}</div>
-          <div className="guide-toolbar"><div className="guide-toolbar-options"><label>{ui("Pesquisar")} <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={ui("Buscar pelo nome...")}/></label><span className="guide-disclosure-hint">{ui('Use o olho em cada objetivo para ver os detalhes.')}</span><div className="options-menu"><button type="button" aria-expanded={menu} onClick={() => setMenu(!menu)}>⋯ {ui('Opções')}</button>{menu && <div className="options-actions"><button disabled={blocked} onClick={exportBackup}>{ui('Exportar progresso')}</button><button onClick={() => input.current?.click()}>{ui('Importar progresso')}</button>{legacyAvailable && <button onClick={restoreLegacy}>{ui('Restaurar backup anterior')}</button>}<small>{ui('Marcações antigas preservadas nos backups, sem contar para platina.')}</small></div>}</div><input ref={input} className="sr-only" type="file" accept=".json,application/json" aria-label={ui("Selecionar arquivo JSON de progresso")} onChange={importBackup}/></div>
+          <div className="region-map-action">{mapUrl ? <a className="region-map-button" href={mapUrl} target="_blank" rel="noopener noreferrer">{interfaceLanguage === 'en' ? 'Open region map ↗' : 'Abrir mapa da região ↗'}</a> : <span title={interfaceLanguage === 'en' ? 'Select a region to open its map.' : 'Selecione uma região para abrir o mapa.'}><button type="button" className="region-map-button" disabled title={interfaceLanguage === 'en' ? 'Select a region to open its map.' : 'Selecione uma região para abrir o mapa.'}>{interfaceLanguage === 'en' ? 'Open region map ↗' : 'Abrir mapa da região ↗'}</button></span>}<small>MetaBot.GG · {interfaceLanguage === 'en' ? 'opens in a new tab; progress is separate' : 'abre em outra aba; progresso separado'}</small></div>
+          <div className="guide-toolbar"><div className="guide-toolbar-options"><label>{ui("Pesquisar")} <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={ui("Buscar pelo nome...")}/></label><span className="guide-disclosure-hint">{ui('Use o olho em cada objetivo para ver os detalhes.')}</span><span className="guide-disclosure-hint">{interfaceLanguage === 'en' ? 'Linked trophies and their documented requirements update together. Unchecking a trophy keeps completed tasks.' : 'Troféus vinculados e seus requisitos documentados atualizam juntos. Desmarcar um troféu preserva as etapas concluídas.'}</span><div className="options-menu"><button type="button" aria-expanded={menu} onClick={() => setMenu(!menu)}>⋯ {ui('Opções')}</button>{menu && <div className="options-actions"><button disabled={blocked} onClick={exportBackup}>{ui('Exportar progresso')}</button><button onClick={() => input.current?.click()}>{ui('Importar progresso')}</button>{legacyAvailable && <button onClick={restoreLegacy}>{ui('Restaurar backup anterior')}</button>}<small>{ui('Marcações antigas preservadas nos backups, sem contar para platina.')}</small></div>}</div><input ref={input} className="sr-only" type="file" accept=".json,application/json" aria-label={ui("Selecionar arquivo JSON de progresso")} onChange={importBackup}/></div>
             <div className="guide-filter-buttons" role="group" aria-label={ui("Filtrar objetivos")}>{filters.map(option => <button key={option} type="button" aria-pressed={filter === option} className={filter === option ? 'active' : ''} onClick={() => setFilter(option)}>{ui(option)}</button>)}</div></div>
           {regionData && <div className="region-summary"><strong>{regionName(regionData.id, regionData.name)}</strong><span>{blocked ? ui('Progresso indisponível') : interfaceLanguage === 'en' ? `${regional?.done}/${regional?.total} required objectives complete · ${regional?.percent}%` : `${regional?.done}/${regional?.total} objetivos necessários concluídos · ${regional?.percent}%`}</span><span>{pendingMissables.length || unresolvedBlockers.length ? interfaceLanguage === 'en' ? `⚠ ${pendingMissables.length} missables and ${unresolvedBlockers.length} prerequisites from other stages pending` : `⚠ ${pendingMissables.length} perdíveis e ${unresolvedBlockers.length} pré-requisitos de outras etapas pendentes` : interfaceLanguage === 'en' ? 'No critical pending items recorded in this selection' : 'Nenhuma pendência crítica cadastrada nesta seleção'}</span>{!blocked && regional?.total && regional.done === regional.total && !pendingMissables.length && !unresolvedBlockers.length ? <span>✓ {interfaceLanguage === 'en' ? 'All recorded objectives in this stage complete' : 'Objetivos cadastrados desta etapa concluídos'}</span> : null}</div>}
           {region !== 'Todas' && <section className={pendingMissables.length || unresolvedBlockers.length ? 'before-leaving urgent' : 'before-leaving'} aria-label={ui("Antes de sair desta região")}><h3>{ui('Antes de sair desta região')}</h3><p>{pendingMissables.length || unresolvedBlockers.length ? interfaceLanguage === 'en' ? `There are ${pendingMissables.length} missable checks and ${unresolvedBlockers.length} prerequisites from other stages pending. Check objectives and lockouts before moving on.` : `Há ${pendingMissables.length} verificações perdíveis e ${unresolvedBlockers.length} pré-requisitos de outras etapas pendentes. Não é seguro afirmar que você pode avançar; confira os objetivos e os gatilhos de bloqueio antes de prosseguir.` : interfaceLanguage === 'en' ? 'No pending missables or prerequisites are recorded here. This does not guarantee complete exploration; consult the roadmap and sources.' : 'Não há perdíveis nem pré-requisitos anteriores cadastrados pendentes nesta área. Isso não garante que toda a exploração esteja completa; confira o roteiro e as fontes.'}</p>{(pendingMissables.length > 0 || unresolvedBlockers.length > 0) && <ul>{pendingMissables.slice(0, 5).map(item => <li key={item.id}>{objectiveName(item)}</li>)}{unresolvedBlockers.slice(0, 5).map(item => <li key={item.id}>{interfaceLanguage === 'en' ? 'Earlier prerequisite:' : 'Pré-requisito anterior:'} {objectiveName(item)}</li>)}</ul>}</section>}
